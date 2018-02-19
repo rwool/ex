@@ -24,16 +24,6 @@ func GetStack() string {
 	return string(getStackBytes())
 }
 
-// SignalsUsed is used to make it so that the goroutine check will not fail due
-// to the extra goroutine created from Go's signal handler.
-//
-// Ostensibly there is no way of stopping Go's signal handler goroutine once
-// it has started, so the number of expected goroutines will increase by one
-// once the handler is started.
-//
-// Deprecated: Has no effect now.
-func SignalsUsed() {}
-
 // getIgnorableCount gets the number of stacks that can be excluded from the
 // count of "effective" goroutines.
 func getIgnorableCount(stack []byte) int {
