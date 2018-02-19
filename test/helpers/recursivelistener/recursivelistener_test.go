@@ -19,7 +19,7 @@ import (
 )
 
 func TestRecursiveListener(t *testing.T) {
-	defer goroutinechecker.New(t, false)()
+	defer goroutinechecker.New(t)()
 
 	l, _ := testlogger.NewTestLogger(t, log.Warn)
 

@@ -23,8 +23,8 @@ import (
 	"github.com/kballard/go-shellquote"
 	"github.com/rwool/ex/test/helpers/clientserverpair"
 
-	"github.com/rwool/ex/log"
 	"github.com/rwool/ex/ex/session"
+	"github.com/rwool/ex/log"
 	"github.com/rwool/ex/test/helpers/testlogger"
 )
 
@@ -100,7 +100,7 @@ func NewSSHServer(logger log.Logger) (d clientserverpair.Dialer, stop func()) {
 }
 
 func TestConnectionSSH(t *testing.T) {
-	defer goroutinechecker.New(t, false)()
+	defer goroutinechecker.New(t)()
 
 	logger, _ := testlogger.NewTestLogger(t, log.Warn)
 	dialer, stopServer := NewSSHServer(logger)

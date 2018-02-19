@@ -24,7 +24,7 @@ func (cw *ChanWriter) Write(p []byte) (int, error) {
 }
 
 func TestRecorder(t *testing.T) {
-	defer goroutinechecker.New(t, false)()
+	defer goroutinechecker.New(t)()
 
 	rec := NewRecorder()
 
@@ -83,7 +83,7 @@ func TestRecorder(t *testing.T) {
 }
 
 func TestRecorderCommandOutput(t *testing.T) {
-	defer goroutinechecker.New(t, false)()
+	defer goroutinechecker.New(t)()
 
 	tcs := []struct {
 		Name              string
@@ -117,7 +117,7 @@ func TestRecorderCommandOutput(t *testing.T) {
 
 	for _, tc := range tcs {
 		t.Run(tc.Name, func(t2 *testing.T) {
-			defer goroutinechecker.New(t2, true)()
+			defer goroutinechecker.New(t2)()
 			rec := NewRecorder()
 			rec.setCommand(tc.Command, tc.Args...)
 			assert.Equal(t2, tc.CommandOut, rec.command())
@@ -127,7 +127,7 @@ func TestRecorderCommandOutput(t *testing.T) {
 }
 
 func TestRecorderAddSpecialEvents(t *testing.T) {
-	defer goroutinechecker.New(t, false)()
+	defer goroutinechecker.New(t)()
 
 	rec := NewRecorder()
 
@@ -153,7 +153,7 @@ func TestRecorderAddSpecialEvents(t *testing.T) {
 }
 
 func TestRecorderReplayNilWriters(t *testing.T) {
-	defer goroutinechecker.New(t, false)()
+	defer goroutinechecker.New(t)()
 
 	rec := NewRecorder()
 	assert.Panics(t, func() {

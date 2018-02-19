@@ -11,7 +11,7 @@ import (
 )
 
 func TestFindSequence(t *testing.T) {
-	defer goroutinechecker.New(t, false)()
+	defer goroutinechecker.New(t)()
 
 	tests := []struct {
 		Name           string
@@ -107,7 +107,7 @@ func TestFindSequence(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.Name, func(t2 *testing.T) {
-			defer goroutinechecker.New(t2, true)()
+			defer goroutinechecker.New(t2)()
 
 			if len(tc.Escapes) != len(tc.EscapesCounter) {
 				panic("counters for escapes must match number of escapes")

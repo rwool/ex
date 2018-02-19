@@ -11,7 +11,7 @@ import (
 )
 
 func TestLoggerBufferWarn(t *testing.T) {
-	defer goroutinechecker.New(t, false)()
+	defer goroutinechecker.New(t)()
 
 	for _, level := range []log.Level{log.Debug, log.Warn, log.Error} {
 		logBuf := bytes.Buffer{}
@@ -49,7 +49,7 @@ func TestLoggerBufferWarn(t *testing.T) {
 }
 
 func TestBadLogLevel(t *testing.T) {
-	defer goroutinechecker.New(t, false)()
+	defer goroutinechecker.New(t)()
 
 	assert.Panics(t, func() {
 		log.NewLogger(nil, log.Level(20))

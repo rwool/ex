@@ -25,7 +25,7 @@ import (
 )
 
 func TestEx(t *testing.T) {
-	defer goroutinechecker.New(t, false)()
+	defer goroutinechecker.New(t)()
 
 	logger, logBuf := testlogger.NewTestLogger(t, log.Warn)
 	dialer, stopServer := NewSSHServer(logger)
@@ -64,7 +64,7 @@ func TestEx(t *testing.T) {
 }
 
 func TestExFailedLogin(t *testing.T) {
-	defer goroutinechecker.New(t, false)()
+	defer goroutinechecker.New(t)()
 
 	logger, logBuf := testlogger.NewTestLogger(t, log.Warn)
 	dialer, stopServer := NewSSHServer(logger)

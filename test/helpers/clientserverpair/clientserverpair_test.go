@@ -18,7 +18,7 @@ import (
 )
 
 func TestClientServerPair(t *testing.T) {
-	defer goroutinechecker.New(t, false)()
+	defer goroutinechecker.New(t)()
 
 	// Note that this test is written mostly with synchronous code.
 	// This will not work with net.Pipe as writes will block waiting for

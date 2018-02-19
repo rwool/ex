@@ -13,7 +13,7 @@ import (
 )
 
 func TestBlockingReader_Cancel(t *testing.T) {
-	defer goroutinechecker.New(t, false)()
+	defer goroutinechecker.New(t)()
 
 	h := strings.NewReader("hello")
 	br := NewBlockingReader(3*time.Second, h)

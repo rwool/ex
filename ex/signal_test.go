@@ -19,7 +19,7 @@ import (
 )
 
 func TestSendSignal(t *testing.T) {
-	defer goroutinechecker.New(t, false)()
+	defer goroutinechecker.New(t)()
 
 	logger, logBuf := testlogger.NewTestLogger(t, log.Warn)
 
@@ -46,7 +46,7 @@ func TestSendSignal(t *testing.T) {
 }
 
 func TestSendOSSignal(t *testing.T) {
-	defer goroutinechecker.New(t, false)()
+	defer goroutinechecker.New(t)()
 
 	logger, logBuf := testlogger.NewTestLogger(t, log.Warn)
 
@@ -72,7 +72,7 @@ func TestSendOSSignal(t *testing.T) {
 }
 
 func TestSignalPanic(t *testing.T) {
-	defer goroutinechecker.New(t, false)()
+	defer goroutinechecker.New(t)()
 
 	// Logging expected, so don't use testlogger here.
 	logBuf := &testlogger.Buffer{} // Thread-safe buffer.
@@ -97,7 +97,7 @@ func TestSignalPanic(t *testing.T) {
 }
 
 func TestSignalBadBeginHandlingArguments(t *testing.T) {
-	defer goroutinechecker.New(t, false)()
+	defer goroutinechecker.New(t)()
 
 	// Nil logger.
 	assert.Panics(t, func() {
@@ -128,7 +128,7 @@ func TestSignalBadBeginHandlingArguments(t *testing.T) {
 }
 
 func TestSignalBeginHandlingTwiceError(t *testing.T) {
-	defer goroutinechecker.New(t, false)()
+	defer goroutinechecker.New(t)()
 
 	logger, _ := testlogger.NewTestLogger(t, log.Warn)
 

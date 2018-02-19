@@ -11,7 +11,7 @@ import (
 )
 
 func TestCartesian(t *testing.T) {
-	defer goroutinechecker.New(t, false)()
+	defer goroutinechecker.New(t)()
 
 	tcs := []struct {
 		Name   string
@@ -69,7 +69,7 @@ func TestCartesian(t *testing.T) {
 
 	for _, tc := range tcs {
 		t.Run(tc.Name, func(t2 *testing.T) {
-			defer goroutinechecker.New(t2, true)()
+			defer goroutinechecker.New(t2)()
 
 			var out [][]interface{}
 			c := cartesian.New(tc.Input...)

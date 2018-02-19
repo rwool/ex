@@ -72,7 +72,7 @@ func CheckNumGoroutines(prevGR int) (passed bool, effectiveGR int) {
 //
 // This function should not be used in tests that also call the T.Parallel
 // method.
-func New(t *testing.T, _ bool) func() {
+func New(t *testing.T) func() {
 	t.Helper()
 
 	startingGR := runtime.NumGoroutine()

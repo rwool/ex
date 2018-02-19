@@ -12,9 +12,9 @@ import (
 )
 
 func TestGoroutineChecker(t *testing.T) {
-	defer goroutinechecker.New(t, false)()
+	defer goroutinechecker.New(t)()
 	t.Run("SubTest", func(t2 *testing.T) {
-		defer goroutinechecker.New(t2, true)
+		defer goroutinechecker.New(t2)
 	})
 }
 
