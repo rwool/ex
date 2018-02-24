@@ -23,7 +23,7 @@ func TestBlockingReader_Cancel(t *testing.T) {
 	read, err := br.Read(buf)
 	elapsed := time.Since(start)
 	require.NoError(t, err)
-	assert.True(t, elapsed > 3*time.Second && elapsed < 4*time.Second,
+	assert.True(t, elapsed > 3*time.Second && elapsed < 5*time.Second,
 		"read blocked for wrong amount of time")
 	assert.Equal(t, "hello", string(buf[:read]), "unexpected output")
 
