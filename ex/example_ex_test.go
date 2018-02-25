@@ -7,11 +7,12 @@ import (
 	"os"
 	"time"
 
+	"sync"
+
 	"github.com/gliderlabs/ssh"
 	"github.com/rwool/ex/ex"
 	"github.com/rwool/ex/ex/session"
 	"github.com/rwool/ex/log"
-	"sync"
 )
 
 // setupServer sets up an in-process SSH server to connect to.
@@ -28,7 +29,7 @@ func setupServer() (sL net.Listener, ip string, port int) {
 		lPort int
 		doneC = make(chan struct{})
 		errC  = make(chan error)
-		wg sync.WaitGroup // To prevent data race on return values.
+		wg    sync.WaitGroup // To prevent data race on return values.
 	)
 	wg.Add(1)
 
@@ -80,12 +81,15 @@ func Example() {
 	defer cancel()
 	defer sL.Close()
 
-	target, err := e.NewSSHTarget(ctx,
-		"Server 1",
-		ip,
-		uint16(port),
-		"test",
-		[]session.Authorizer{session.PasswordAuth("password123")})
+	target, err := e.NewSSHTarget(ctx, &ex.SSHTargetConfig{
+		Name: "Server 1",
+		Host: ip,
+		Port: uint16(port),
+		User: "test",
+		Auths: []session.Authorizer{
+			session.PasswordAuth("password123"),
+		},
+	})
 	if err != nil {
 		l.Errorf("Unable to connect to SSH server: %+v", err)
 		os.Exit(1)

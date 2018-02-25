@@ -131,21 +131,36 @@ func (r *Ex) GetTarget(name string) Target {
 	return r.nameToTargets[name]
 }
 
+// SSHTargetConfig contains the options for creating an SSH target.
+type SSHTargetConfig struct {
+	// Name of this connection in Ex.
+	Name string
+	// Host is the host that will be connected to.
+	Host string
+	// Port is the port of the host to connect to.
+	Port uint16
+	// User is the name of the user that the connection will be made with.
+	User string
+	// Auths is a list of the authorization methods that will be used upon
+	// connection.
+	Auths []session.Authorizer
+}
+
 // NewSSHTarget creates an SSH target to the given system.
-func (r *Ex) NewSSHTarget(ctx context.Context, name, host string, port uint16, user string, auths []session.Authorizer) (Target, error) {
+func (r *Ex) NewSSHTarget(ctx context.Context, conf *SSHTargetConfig) (Target, error) {
 	r.nameToTargetsMu.Lock()
 	defer r.nameToTargetsMu.Unlock()
 
-	if _, ok := r.nameToTargets[name]; ok {
+	if _, ok := r.nameToTargets[conf.Name]; ok {
 		return nil, errors.New("target already exists with the given name")
 	}
 
-	target, err := NewSSHTarget(ctx, r.logger, r.dialer, host, port, nil, user, auths)
+	target, err := NewSSHTarget(ctx, r.logger, r.dialer, conf.Host, conf.Port, nil, conf.User, conf.Auths)
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to create SSH target")
 	}
-	r.nameToTargets[name] = target
-	r.logger.Debugf("Added SSH target: %s", name)
+	r.nameToTargets[conf.Name] = target
+	r.logger.Debugf("Added SSH target: %s", conf.Name)
 
 	return target, nil
 }

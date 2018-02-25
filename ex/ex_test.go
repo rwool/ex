@@ -42,8 +42,15 @@ func TestEx(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
 
-	target, err := e.NewSSHTarget(ctx, "Server 1", "127.0.0.1", 22, "test",
-		[]session.Authorizer{session.PasswordAuth("Password123")})
+	target, err := e.NewSSHTarget(ctx, &ex.SSHTargetConfig{
+		Name: "Server 1",
+		Host: "127.0.0.1",
+		Port: 22,
+		User: "test",
+		Auths: []session.Authorizer{
+			session.PasswordAuth("Password123"),
+		},
+	})
 	require.NoError(t, err, "error creating target")
 
 	cmd := target.Command("whoami")
@@ -81,8 +88,15 @@ func TestExFailedLogin(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
 
-	_, err := e.NewSSHTarget(ctx, "Server 1", "127.0.0.1", 22, "test",
-		[]session.Authorizer{session.PasswordAuth("wrong")})
+	_, err := e.NewSSHTarget(ctx, &ex.SSHTargetConfig{
+		Name: "Server 1",
+		Host: "127.0.0.1",
+		Port: 22,
+		User: "test",
+		Auths: []session.Authorizer{
+			session.PasswordAuth("wrong"),
+		},
+	})
 
 	defer func() {
 		require.NoError(t, e.Close(), "error closing Ex")

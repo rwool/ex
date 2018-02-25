@@ -38,7 +38,15 @@ func setupLoggerAndClient(tb testing.TB, level log.Level,
 	e := ex.New(logger, exBuf, exBuf)
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	target, err := e.NewSSHTarget(ctx, "test", server.Host(), server.Port(), "test", []session.Authorizer{authorizer})
+	target, err := e.NewSSHTarget(ctx, &ex.SSHTargetConfig{
+		Name: "test",
+		Host: server.Host(),
+		Port: server.Port(),
+		User: "test",
+		Auths: []session.Authorizer{
+			authorizer,
+		},
+	})
 	require.NoError(tb, err, "failed to create SSH target")
 	require.NotNil(tb, target, "nil target returned")
 
