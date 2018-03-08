@@ -28,7 +28,7 @@ func TestEx(t *testing.T) {
 	defer goroutinechecker.New(t)()
 
 	logger, logBuf := testlogger.NewTestLogger(t, log.Warn)
-	dialer, stopServer := NewSSHServer(logger)
+	dialer, hostKey, stopServer := NewSSHServer(logger)
 	defer func() {
 		stopServer()
 		time.Sleep(50 * time.Millisecond)
@@ -50,6 +50,7 @@ func TestEx(t *testing.T) {
 		Auths: []session.Authorizer{
 			session.PasswordAuth("Password123"),
 		},
+		HostKeyCallback: session.FixedHostKey(hostKey),
 	})
 	require.NoError(t, err, "error creating target")
 
@@ -74,7 +75,7 @@ func TestExFailedLogin(t *testing.T) {
 	defer goroutinechecker.New(t)()
 
 	logger, logBuf := testlogger.NewTestLogger(t, log.Warn)
-	dialer, stopServer := NewSSHServer(logger)
+	dialer, hostKey, stopServer := NewSSHServer(logger)
 	defer func() {
 		stopServer()
 		time.Sleep(50 * time.Millisecond)
@@ -96,6 +97,7 @@ func TestExFailedLogin(t *testing.T) {
 		Auths: []session.Authorizer{
 			session.PasswordAuth("wrong"),
 		},
+		HostKeyCallback: session.FixedHostKey(hostKey),
 	})
 
 	defer func() {

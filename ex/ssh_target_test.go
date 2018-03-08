@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/rwool/ex/test/helpers/goroutinechecker"
+	ssh2 "golang.org/x/crypto/ssh"
 
 	"github.com/rwool/ex/test/helpers/recursivelistener"
 
@@ -22,6 +23,9 @@ import (
 	"github.com/gliderlabs/ssh"
 	"github.com/kballard/go-shellquote"
 	"github.com/rwool/ex/test/helpers/clientserverpair"
+
+	"crypto/rand"
+	"crypto/rsa"
 
 	"github.com/rwool/ex/ex/session"
 	"github.com/rwool/ex/log"
@@ -49,7 +53,7 @@ var commandMap = map[string]commandOutput{
 	},
 }
 
-func NewSSHServer(logger log.Logger) (d clientserverpair.Dialer, stop func()) {
+func NewSSHServer(logger log.Logger) (d clientserverpair.Dialer, pubKey ssh2.PublicKey, stop func()) {
 	ssh.Handle(func(s ssh.Session) {
 		if len(s.Command()) == 0 {
 			panic("unimplemented")
@@ -74,14 +78,28 @@ func NewSSHServer(logger log.Logger) (d clientserverpair.Dialer, stop func()) {
 	logger.Debug("created dialer/listener pair")
 	errC := make(chan error)
 	cancelC := make(chan struct{})
+
+	key, err := rsa.GenerateKey(rand.Reader, 1024)
+	if err != nil {
+		panic(err)
+	}
+	signer, err := ssh2.NewSignerFromKey(key)
+	if err != nil {
+		panic(err)
+	}
+
 	go func() {
 		logger.Debug("About serve SSH")
-		err := ssh.Serve(li, nil, ssh.PasswordAuth(func(user, password string) bool {
-			if user == "test" && password == "Password123" {
-				return true
-			}
-			return false
-		}))
+		srv := &ssh.Server{
+			PasswordHandler: func(user, password string) bool {
+				if user == "test" && password == "Password123" {
+					return true
+				}
+				return false
+			},
+			HostSigners: []ssh.Signer{signer.(ssh.Signer)},
+		}
+		err = srv.Serve(li)
 		select {
 		case errC <- err:
 		case <-cancelC:
@@ -96,14 +114,14 @@ func NewSSHServer(logger log.Logger) (d clientserverpair.Dialer, stop func()) {
 	}
 	logger.Debug("No error attempting to start SSH server")
 
-	return d, func() { close(cancelC); l.Close() }
+	return d, signer.PublicKey(), func() { close(cancelC); l.Close() }
 }
 
 func TestConnectionSSH(t *testing.T) {
 	defer goroutinechecker.New(t)()
 
 	logger, _ := testlogger.NewTestLogger(t, log.Warn)
-	dialer, stopServer := NewSSHServer(logger)
+	dialer, hostKey, stopServer := NewSSHServer(logger)
 	defer func() {
 		stopServer()
 		time.Sleep(50 * time.Millisecond)
@@ -122,8 +140,10 @@ func TestConnectionSSH(t *testing.T) {
 		assert.Equal(t, has, buf.String())
 	}
 
+	hkOpt := ex.HostKeyValidationOption(session.FixedHostKey(hostKey))
 	c, err := ex.NewSSHTarget(ctx, logger, dialer, "127.0.0.1", 22,
-		nil, "test", []session.Authorizer{session.PasswordAuth("Password123")})
+		[]ex.Option{hkOpt}, "test",
+		[]session.Authorizer{session.PasswordAuth("Password123")})
 	require.NoError(t, err, "error getting SSH target")
 
 	rec, err := c.Command("whoami").Run(ctx)

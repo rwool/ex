@@ -7,29 +7,37 @@ import (
 	"os"
 	"time"
 
+	"crypto/rsa"
+
+	"crypto/rand"
+
 	"sync"
 
 	"github.com/gliderlabs/ssh"
 	"github.com/rwool/ex/ex"
 	"github.com/rwool/ex/ex/session"
 	"github.com/rwool/ex/log"
+	ssh2 "golang.org/x/crypto/ssh"
 )
 
 // setupServer sets up an in-process SSH server to connect to.
 //
 // Only meant for demonstration purposes.
-func setupServer() (sL net.Listener, ip string, port int) {
+func setupServer() (sL net.Listener, ip string, port int, pubKey ssh.PublicKey) {
 	ssh.Handle(func(s ssh.Session) {
 		fmt.Fprintln(s, "test")
 		s.Exit(0)
 	})
 	var (
-		l     net.Listener
-		lIP   string
-		lPort int
-		doneC = make(chan struct{})
-		errC  = make(chan error)
-		wg    sync.WaitGroup // To prevent data race on return values.
+		l      net.Listener
+		lIP    string
+		lPort  int
+		signer ssh2.Signer
+		errC   = make(chan error, 1)
+		// WaitGroup to know when to start error timer. Key
+		// generation can take longer than the timeout duration, so without
+		// this, the test can fail.
+		wg sync.WaitGroup
 	)
 	wg.Add(1)
 
@@ -43,36 +51,47 @@ func setupServer() (sL net.Listener, ip string, port int) {
 		lIP = tcpAddr.IP.String()
 		lPort = tcpAddr.Port
 		lPort = l.Addr().(*net.TCPAddr).Port
+		priv, err := rsa.GenerateKey(rand.Reader, 1024)
+		if err != nil {
+			panic(err)
+		}
+		signer, err = ssh2.NewSignerFromKey(priv)
+		if err != nil {
+			panic(err)
+		}
 		wg.Done()
-		err = ssh.Serve(l,
+
+		srv := &ssh.Server{
+			Handler: nil,
+			PasswordHandler: func(user, password string) bool {
+				// For example only, this is not secure.
+				return user == "test" && password == "password123"
+			},
+		}
+		srv.AddHostKey(signer.(ssh.Signer))
+		srv.Serve(l)
+		errC <- ssh.Serve(l,
 			nil,
 			ssh.PasswordAuth(func(user, password string) bool {
 				// For example only, this is not secure.
 				return user == "test" && password == "password123"
 			}))
-		select {
-		case <-doneC:
-			return
-		default:
-			panic(err)
-		}
 	}()
 	timer := time.NewTimer(100 * time.Millisecond)
 	defer timer.Stop()
 
+	wg.Wait()
 	select {
 	case err := <-errC:
 		panic(err)
 	case <-timer.C:
-		close(doneC)
 	}
-	wg.Wait()
-	return l, lIP, lPort
+	return l, lIP, lPort, signer.PublicKey()
 }
 
 func Example() {
 	// For example client to connect to.
-	sL, ip, port := setupServer()
+	sL, ip, port, pubKey := setupServer()
 
 	l := log.NewLogger(os.Stderr, log.Warn)
 	e := ex.New(l, os.Stdout, os.Stderr)
@@ -89,6 +108,7 @@ func Example() {
 		Auths: []session.Authorizer{
 			session.PasswordAuth("password123"),
 		},
+		HostKeyCallback: session.FixedHostKey(pubKey),
 	})
 	if err != nil {
 		l.Errorf("Unable to connect to SSH server: %+v", err)

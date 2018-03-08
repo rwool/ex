@@ -144,6 +144,8 @@ type SSHTargetConfig struct {
 	// Auths is a list of the authorization methods that will be used upon
 	// connection.
 	Auths []session.Authorizer
+	// HostKeyCallback is a function that is called to verify a host key.
+	HostKeyCallback session.HostKeyCallback
 }
 
 // NewSSHTarget creates an SSH target to the given system.
@@ -151,11 +153,16 @@ func (r *Ex) NewSSHTarget(ctx context.Context, conf *SSHTargetConfig) (Target, e
 	r.nameToTargetsMu.Lock()
 	defer r.nameToTargetsMu.Unlock()
 
+	if conf.HostKeyCallback == nil {
+		return nil, errors.New("no host key callback")
+	}
+
 	if _, ok := r.nameToTargets[conf.Name]; ok {
 		return nil, errors.New("target already exists with the given name")
 	}
 
-	target, err := NewSSHTarget(ctx, r.logger, r.dialer, conf.Host, conf.Port, nil, conf.User, conf.Auths)
+	hkcOpt := HostKeyValidationOption(conf.HostKeyCallback)
+	target, err := NewSSHTarget(ctx, r.logger, r.dialer, conf.Host, conf.Port, []Option{hkcOpt}, conf.User, conf.Auths)
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to create SSH target")
 	}
