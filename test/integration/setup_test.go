@@ -28,7 +28,7 @@ type testObjects struct {
 // setupLoggerAndClient sets up an logger, SSH server, and sets up a target with
 // Ex.
 func setupLoggerAndClient(tb testing.TB, level log.Level,
-	serverType sshserver.ServerType, authorizer session.Authorizer) *testObjects {
+	serverType sshserver.ServerType, authorizer session.Authorizer, hkc session.HostKeyCallback) *testObjects {
 	logger, logBuf := testlogger.NewTestLogger(tb, level)
 
 	server, err := sshserver.GetSSHServer(serverType, logger)
@@ -46,6 +46,7 @@ func setupLoggerAndClient(tb testing.TB, level log.Level,
 		Auths: []session.Authorizer{
 			authorizer,
 		},
+		HostKeyCallback: hkc,
 	})
 	require.NoError(tb, err, "failed to create SSH target")
 	require.NotNil(tb, target, "nil target returned")
