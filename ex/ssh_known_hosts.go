@@ -8,6 +8,8 @@ import (
 
 	"fmt"
 
+	"os"
+
 	"github.com/pkg/errors"
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/crypto/ssh/knownhosts"
@@ -121,6 +123,15 @@ func AddToKnownHosts(f io.WriteSeeker, hosts []string, pubKey ssh.PublicKey, dis
 	case MarkerRevoked:
 		m = mRevoked + " "
 	}
+
 	_, err = fmt.Fprint(f, m, newLine)
 	return errors.Wrap(err, "unable to write new known_hosts line")
+}
+
+// DefaultKnownHosts returns the standard known_hosts file paths
+// for the known_hosts files that are found.
+func DefaultKnownHosts() ([]string, error) {
+	return getKnownHostPaths(func(s string) (io.Closer, error) {
+		return os.Open(s)
+	})
 }
