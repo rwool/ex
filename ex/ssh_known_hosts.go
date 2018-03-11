@@ -135,3 +135,40 @@ func DefaultKnownHosts() ([]string, error) {
 		return os.Open(s)
 	})
 }
+
+// KnownHostsFilesCallback creates a host key callback using the hosts
+// specified in the given known_hosts files.
+//
+// To support adding host keys dynamically, the returned HostKeyCallback may
+// be wrapped in a function to support handling the returned errors from the
+// callback.
+func KnownHostsFilesCallback(knownHostsPaths ...string) (ssh.HostKeyCallback, error) {
+	return knownhosts.New(knownHostsPaths...)
+}
+
+// IsUnknownHost indicates if the given error was due to an unknown host.
+func IsUnknownHost(e error) bool {
+	if ke, ok := e.(*knownhosts.KeyError); ok {
+		return len(ke.Want) == 0
+	}
+	return false
+}
+
+// IsKeyChange indicates if the given error was due to an unexpected host
+// key for an already known host.
+//
+// If this returns true, then it may be an indication of a
+// man-in-the-middle attack.
+func IsKeyChange(e error) bool {
+	if ke, ok := e.(*knownhosts.KeyError); ok {
+		return len(ke.Want) > 0
+	}
+	return false
+}
+
+// IsRevoked indicates if the given error was due to a revoked host key
+// being given.
+func IsRevoked(e error) bool {
+	_, ok := e.(*knownhosts.RevokedError)
+	return ok
+}

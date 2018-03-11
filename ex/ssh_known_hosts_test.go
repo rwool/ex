@@ -16,6 +16,10 @@ import (
 	"crypto/rand"
 	"crypto/rsa"
 
+	"io/ioutil"
+	"net"
+	"os"
+
 	"github.com/rwool/ex/test/helpers/comperr"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -287,4 +291,78 @@ func TestAddToKnownHosts(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestKnownHostsFile(t *testing.T) {
+	t.Parallel()
+	f, err := ioutil.TempFile("", "my_temp")
+	require.NoError(t, err, "Temp file creation does not fail.")
+	defer os.Remove(f.Name())
+	defer f.Close()
+
+	cb, err := KnownHostsFilesCallback(f.Name())
+	require.NoError(t, err, "Known host file callback creation does not fail.")
+
+	rsaPrivKey, err := rsa.GenerateKey(rand.Reader, 1024)
+	require.NoError(t, err, "Private key generation does not fail.")
+
+	sshPubKey, err := ssh.NewPublicKey(rsaPrivKey.Public())
+	require.NoError(t, err, "SSH public key creation does not fail.")
+
+	hostname := "localhost:22"
+	hostIP := "127.0.0.1"
+	port := 22
+	err = cb(hostname, &net.TCPAddr{
+		IP:   net.ParseIP(hostIP),
+		Port: port,
+	}, sshPubKey)
+
+	// Unknown host.
+	require.True(t, IsUnknownHost(err), "Host must be unknown")
+
+	// Known host.
+	err = AddToKnownHosts(f, []string{hostIP}, sshPubKey, true, MarkerNone)
+	require.NoError(t, err, "known_hosts host addition does not fail.")
+	_, err = f.Seek(0, io.SeekStart)
+	require.NoError(t, err, "Seek to file beginning does not fail.")
+	cb, err = KnownHostsFilesCallback(f.Name())
+	require.NoError(t, err, "Known host file callback creation does not fail.")
+	err = cb(hostname, &net.TCPAddr{
+		IP:   net.ParseIP(hostIP),
+		Port: port,
+	}, sshPubKey)
+	require.NoError(t, err, "Host key verification with known host succeeds.")
+
+	// Bad key.
+	err = f.Truncate(0)
+	require.NoError(t, err, "known_hosts trucation must succeed.")
+	rsaPrivKey2, err := rsa.GenerateKey(rand.Reader, 1024)
+	require.NoError(t, err, "Private key generation does not fail.")
+	sshPubKey2, err := ssh.NewPublicKey(rsaPrivKey2.Public())
+	err = AddToKnownHosts(f, []string{hostIP}, sshPubKey2, true, MarkerNone)
+	require.NoError(t, err, "known_hosts host addition does not fail.")
+	cb, err = KnownHostsFilesCallback(f.Name())
+	require.NoError(t, err, "Known host file callback creation does not fail.")
+	err = cb(hostname, &net.TCPAddr{
+		IP:   net.ParseIP(hostIP),
+		Port: port,
+	}, sshPubKey)
+	require.True(t, IsKeyChange(err), "Key for host change detected.")
+
+	// Revoked key.
+	err = f.Truncate(0)
+	require.NoError(t, err, "known_hosts trucation must succeed.")
+	_, err = f.Seek(0, io.SeekStart)
+	require.NoError(t, err, "Seek to file beginning does not fail.")
+	err = AddToKnownHosts(f, []string{hostIP}, sshPubKey, true, MarkerRevoked)
+	require.NoError(t, err, "known_hosts host addition does not fail.")
+	_, err = f.Seek(0, io.SeekStart)
+	require.NoError(t, err, "Seek to file beginning does not fail.")
+	cb, err = KnownHostsFilesCallback(f.Name())
+	require.NoError(t, err, "Known host file callback creation does not fail.")
+	err = cb(hostname, &net.TCPAddr{
+		IP:   net.ParseIP(hostIP),
+		Port: port,
+	}, sshPubKey)
+	require.True(t, IsRevoked(err), "Key revocation detected.")
 }
