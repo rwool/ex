@@ -53,8 +53,9 @@ func (c *Cartesian) output() []interface{} {
 	return out
 }
 
-// Next returns the next cartesian product. If there are no more products, nil
-// will be returned.
+// Next generates the next cartesian product. If there are no more products,
+// false will be returned. A value of true being returned indicates the Slice
+// method may be called.
 func (c *Cartesian) Next() bool {
 	if len(c.ss) == 0 {
 		c.next = nil
