@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"io"
+
+	"github.com/rwool/ex/ex/internal/signal"
 )
 
 // ErrNotRunning indicates a failure due to the command not running.
@@ -37,11 +39,11 @@ type Command interface {
 	SetEnv(vars map[string]string)
 
 	// Run runs the command and waits for it to finish.
-	Run(ctx context.Context) (*Recorder, error)
+	Run(ctx context.Context) (Recorder, error)
 
 	// Start begins execution of the command, but does not wait for it to
 	// finish.
-	Start(ctx context.Context) (*Recorder, error)
+	Start(ctx context.Context) (Recorder, error)
 
 	// Wait waits for a command to finish that was previously started with
 	// Start.
@@ -60,6 +62,9 @@ type WindowChanger interface {
 	// dimensions.
 	SetTerm(height, width int)
 }
+
+// Signal is a representation of a real or virtual OS signal.
+type Signal = signal.Signal
 
 // Signaller wraps the functions to send a signal.
 type Signaller interface {

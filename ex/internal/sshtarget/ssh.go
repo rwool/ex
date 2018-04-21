@@ -1,5 +1,5 @@
-// Package session provides support for managing a client SSH connection.
-package session
+// Package sshtarget provides support for managing a client SSH connection.
+package sshtarget
 
 import (
 	"context"
@@ -43,7 +43,7 @@ func NewSSH(ctx context.Context, logger log.Logger, conn net.Conn, address strin
 		if v == nil {
 			panic(fmt.Sprintf("nil authorizer given at index %d", i))
 		}
-		sshAuths = append(sshAuths, v.getAuthMethod())
+		sshAuths = append(sshAuths, v.GetAuthMethod())
 	}
 
 	sshConf := ssh.ClientConfig{

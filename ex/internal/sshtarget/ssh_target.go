@@ -1,4 +1,4 @@
-package ex
+package sshtarget
 
 import (
 	"context"
@@ -9,9 +9,17 @@ import (
 	"sync"
 
 	"github.com/pkg/errors"
-	"github.com/rwool/ex/ex/session"
+	"github.com/rwool/ex/ex/internal/recorder"
 	"github.com/rwool/ex/log"
 )
+
+// Dialer is the interface that wraps the dial method.
+//
+// Primarily used for abstracting out possible dialer implementations as there
+// is no dialer interface in the standard library.
+type Dialer interface {
+	DialContext(ctx context.Context, network, address string) (net.Conn, error)
+}
 
 // SSHTarget is a generic connection to a system for executing commands.
 type SSHTarget struct {
@@ -20,14 +28,14 @@ type SSHTarget struct {
 	port      uint16
 	dialer    Dialer
 	logger    log.Logger
-	auths     []session.Authorizer
-	hostKeyCB session.HostKeyCallback
+	auths     []Authorizer
+	hostKeyCB HostKeyCallback
 
 	mu sync.Mutex
 
-	client *session.SSH
+	client *SSH
 
-	sessions []*sshSession
+	sessions []*SSHSession
 
 	sessionCtx    context.Context
 	sessionCancel context.CancelFunc
@@ -37,9 +45,9 @@ type SSHTarget struct {
 	isClosed bool
 }
 
-// NewSSHTarget creates a new connection with an SSH server.
-func NewSSHTarget(ctx context.Context, logger log.Logger, dialer Dialer,
-	host string, port uint16, opts []Option, username string, auths []session.Authorizer) (*SSHTarget, error) {
+// New creates a new connection with an SSH server.
+func New(ctx context.Context, logger log.Logger, dialer Dialer,
+	host string, port uint16, opts []Option, username string, auths []Authorizer) (*SSHTarget, error) {
 	if logger == nil {
 		panic("nil logger")
 	}
@@ -50,14 +58,14 @@ func NewSSHTarget(ctx context.Context, logger log.Logger, dialer Dialer,
 		panic("no authorizers given")
 	}
 
-	var hkc session.HostKeyCallback
+	var hkc HostKeyCallback
 	for _, v := range opts {
 		switch v.(type) {
-		case session.HostKeyCallback:
-			hkc = v.(session.HostKeyCallback)
+		case HostKeyCallback:
+			hkc = v.(HostKeyCallback)
 		}
 	}
-	hkc = session.InsecureIgnoreHostKey()
+	hkc = InsecureIgnoreHostKey()
 
 	c := &SSHTarget{
 		user:      username,
@@ -85,7 +93,7 @@ func NewSSHTarget(ctx context.Context, logger log.Logger, dialer Dialer,
 }
 
 // Command creates a command that can be run on the SSHTarget.
-func (st *SSHTarget) Command(cmd string, args ...string) Command {
+func (st *SSHTarget) Command(cmd string, args ...string) *SSHSession {
 	st.mu.Lock()
 	defer st.mu.Unlock()
 
@@ -95,15 +103,15 @@ func (st *SSHTarget) Command(cmd string, args ...string) Command {
 		st.sessionWG.Done()
 	})
 
-	as.rec = NewRecorder()
-	as.rec.setCommand(cmd, args...)
+	as.rec = recorder.NewRecorder()
+	as.rec.SetCommand(cmd, args...)
 	as.logger = st.logger
-	as.conf.Command = as.rec.command()
+	as.conf.Command = as.rec.Command()
 	as.conf.AsyncErrLogger = func(e error) {
 		as.logger.Errorf("Error in SSH session: %+v", e)
 	}
-	as.conf.PreRunFunc = as.rec.startTiming
-	as.rec.setOutput(&as.conf.StdOut, &as.conf.StdErr)
+	as.conf.PreRunFunc = as.rec.StartTiming
+	as.rec.SetOutput(&as.conf.StdOut, &as.conf.StdErr)
 	as.ssh = st.client
 	as.errC = make(chan error)
 
@@ -116,9 +124,6 @@ func (st *SSHTarget) Command(cmd string, args ...string) Command {
 // SSHTarget.
 type Option interface{}
 
-// WindowDims contains the dimensions of the window.
-type WindowDims = session.WindowDims
-
 // getClient gets an SSH connection by connecting to an SSH server.
 func (st *SSHTarget) getClient(ctx context.Context) error {
 	address := net.JoinHostPort(st.host, strconv.Itoa(int(st.port)))
@@ -127,7 +132,7 @@ func (st *SSHTarget) getClient(ctx context.Context) error {
 		return errors.Wrap(err, "unable to dial remote host")
 	}
 
-	client, err := session.NewSSH(ctx, st.logger, conn, address, st.hostKeyCB, st.user, st.auths)
+	client, err := NewSSH(ctx, st.logger, conn, address, st.hostKeyCB, st.user, st.auths)
 	if err != nil {
 		return errors.Wrap(err, "unable to get SSH session")
 	}
@@ -189,6 +194,6 @@ var ErrNoSSHConnection = errors2.New("no SSH connection")
 
 // HostKeyValidationOption returns an option to set the use of a host key
 // callback.
-func HostKeyValidationOption(callback session.HostKeyCallback) Option {
+func HostKeyValidationOption(callback HostKeyCallback) Option {
 	return callback
 }

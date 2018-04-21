@@ -15,7 +15,6 @@ import (
 
 	"github.com/gliderlabs/ssh"
 	"github.com/rwool/ex/ex"
-	"github.com/rwool/ex/ex/session"
 	"github.com/rwool/ex/log"
 	ssh2 "golang.org/x/crypto/ssh"
 )
@@ -105,10 +104,10 @@ func Example() {
 		Host: ip,
 		Port: uint16(port),
 		User: "test",
-		Auths: []session.Authorizer{
-			session.PasswordAuth("password123"),
+		Auths: []ex.SSHAuthorizer{
+			ex.NewSSHPasswordAuth("password123"),
 		},
-		HostKeyCallback: session.FixedHostKey(pubKey),
+		HostKeyCallback: ex.SSHFixedHostKey(pubKey),
 	})
 	if err != nil {
 		l.Errorf("Unable to connect to SSH server: %+v", err)

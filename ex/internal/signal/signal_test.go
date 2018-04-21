@@ -1,4 +1,4 @@
-package ex_test
+package signal_test
 
 import (
 	"os"
@@ -8,13 +8,13 @@ import (
 
 	"github.com/rwool/ex/test/helpers/goroutinechecker"
 
-	"github.com/rwool/ex/ex"
 	"github.com/rwool/ex/test/helpers/testlogger"
 
 	"github.com/rwool/ex/log"
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/rwool/ex/ex/internal/signal"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -24,15 +24,15 @@ func TestSendSignal(t *testing.T) {
 	logger, logBuf := testlogger.NewTestLogger(t, log.Warn)
 
 	sigC := make(chan string)
-	err := ex.BeginSignalHandling(logger, func(s ex.Signal) {
+	err := signal.BeginSignalHandling(logger, func(s signal.Signal) {
 		sigC <- s.String()
 	})
 	require.NoError(t, err)
-	defer ex.StopSignalHandling()
+	defer signal.StopSignalHandling()
 
-	s := ex.SIGUSR1
+	s := signal.SIGUSR1
 
-	ex.SendSignal(s)
+	signal.SendSignal(s)
 
 	var out string
 	select {
@@ -51,19 +51,19 @@ func TestSendOSSignal(t *testing.T) {
 	logger, logBuf := testlogger.NewTestLogger(t, log.Warn)
 
 	sig := syscall.SIGHUP
-	sigC := make(chan ex.Signal)
-	err := ex.BeginSignalHandling(logger, nil, ex.SIGHUP, func(s ex.Signal) {
+	sigC := make(chan signal.Signal)
+	err := signal.BeginSignalHandling(logger, nil, signal.SIGHUP, func(s signal.Signal) {
 		sigC <- s
 	})
 	require.NoError(t, err, "unexpected error from starting signal handling")
-	defer ex.StopSignalHandling()
+	defer signal.StopSignalHandling()
 
 	err = syscall.Kill(os.Getpid(), sig)
 	require.NoError(t, err, "unexpected error from sending signal")
 
 	select {
 	case s := <-sigC:
-		assert.Equal(t, ex.SIGHUP, s, "mismatched signal")
+		assert.Equal(t, signal.SIGHUP, s, "mismatched signal")
 	case <-time.After(2 * time.Second):
 		t.Fatal("timeout waiting for signal handler to be called")
 	}
@@ -78,11 +78,11 @@ func TestSignalPanic(t *testing.T) {
 	logBuf := &testlogger.Buffer{} // Thread-safe buffer.
 	logger := log.NewLogger(logBuf, log.Error)
 
-	err := ex.BeginSignalHandling(logger, func(ex.Signal) {
+	err := signal.BeginSignalHandling(logger, func(signal.Signal) {
 		panic("test panic")
 	})
 	require.NoError(t, err, "unexpected error starting signal handling")
-	defer ex.StopSignalHandling()
+	defer signal.StopSignalHandling()
 
 	// OS signal.
 	err = syscall.Kill(os.Getpid(), syscall.SIGQUIT)
@@ -91,7 +91,7 @@ func TestSignalPanic(t *testing.T) {
 	assert.Contains(t, logBuf.String(), "panic from calling handler for OS signal")
 
 	// Virtual signal.
-	ex.SendSignal(ex.SIGKILL)
+	signal.SendSignal(signal.SIGKILL)
 	time.Sleep(20 * time.Millisecond)
 	assert.Contains(t, logBuf.String(), "panic from calling handler for non-OS signal")
 }
@@ -101,29 +101,29 @@ func TestSignalBadBeginHandlingArguments(t *testing.T) {
 
 	// Nil logger.
 	assert.Panics(t, func() {
-		ex.BeginSignalHandling(nil, nil)
+		signal.BeginSignalHandling(nil, nil)
 	})
 
 	logger, _ := testlogger.NewTestLogger(t, log.Warn)
 
 	// Incorrect number of handler arguments.
 	assert.Panics(t, func() {
-		ex.BeginSignalHandling(logger, nil, ex.SIGQUIT)
+		signal.BeginSignalHandling(logger, nil, signal.SIGQUIT)
 	})
 
 	// Incorrect type for signal argument (sycall.Signal).
 	assert.Panics(t, func() {
-		ex.BeginSignalHandling(logger, nil, syscall.SIGHUP, func(ex.Signal) {})
+		signal.BeginSignalHandling(logger, nil, syscall.SIGHUP, func(signal.Signal) {})
 	})
 
 	// Incorrect type for signal argument (other).
 	assert.Panics(t, func() {
-		ex.BeginSignalHandling(logger, nil, "SIGHUP", func(ex.Signal) {})
+		signal.BeginSignalHandling(logger, nil, "SIGHUP", func(signal.Signal) {})
 	})
 
 	// Incorrect type for function argument.
 	assert.Panics(t, func() {
-		ex.BeginSignalHandling(logger, nil, ex.SIGHUP, func() {})
+		signal.BeginSignalHandling(logger, nil, signal.SIGHUP, func() {})
 	})
 }
 
@@ -132,11 +132,11 @@ func TestSignalBeginHandlingTwiceError(t *testing.T) {
 
 	logger, _ := testlogger.NewTestLogger(t, log.Warn)
 
-	err := ex.BeginSignalHandling(logger, nil)
+	err := signal.BeginSignalHandling(logger, nil)
 	require.NoError(t, err, "unexpected error starting signal handling")
-	defer ex.StopSignalHandling()
+	defer signal.StopSignalHandling()
 
-	err = ex.BeginSignalHandling(logger, nil)
-	require.EqualError(t, err, ex.ErrHandlersAlreadySet.Error(),
+	err = signal.BeginSignalHandling(logger, nil)
+	require.EqualError(t, err, signal.ErrHandlersAlreadySet.Error(),
 		"unexpected error from starting signal handling")
 }

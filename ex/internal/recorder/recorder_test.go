@@ -1,4 +1,4 @@
-package ex
+package recorder
 
 import (
 	"bytes"
@@ -29,12 +29,12 @@ func TestRecorder(t *testing.T) {
 	rec := NewRecorder()
 
 	var stdoutWriter, stderrWriter io.Writer
-	rec.setOutput(&stdoutWriter, &stderrWriter)
+	rec.SetOutput(&stdoutWriter, &stderrWriter)
 
 	var outBuf, errBuf bytes.Buffer
-	rec.setPassthrough(&outBuf, &errBuf)
+	rec.SetPassthrough(&outBuf, &errBuf)
 
-	rec.startTiming()
+	rec.StartTiming()
 	stdoutWriter.Write([]byte("Hello"))
 
 	buf := bytes.Buffer{}
@@ -119,8 +119,8 @@ func TestRecorderCommandOutput(t *testing.T) {
 		t.Run(tc.Name, func(t2 *testing.T) {
 			defer goroutinechecker.New(t2)()
 			rec := NewRecorder()
-			rec.setCommand(tc.Command, tc.Args...)
-			assert.Equal(t2, tc.CommandOut, rec.command())
+			rec.SetCommand(tc.Command, tc.Args...)
+			assert.Equal(t2, tc.CommandOut, rec.Command())
 			assert.Equal(t2, tc.CommandEscapedOut, rec.commandEscaped())
 		})
 	}
@@ -131,7 +131,7 @@ func TestRecorderAddSpecialEvents(t *testing.T) {
 
 	rec := NewRecorder()
 
-	rec.startTiming()
+	rec.StartTiming()
 	rec.AddSpecialEvent(EscapeEvent, "test")
 	time.Sleep(1 * time.Second)
 	rec.AddSpecialEvent(EscapeEvent, "word")

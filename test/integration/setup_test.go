@@ -8,8 +8,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/rwool/ex/ex/session"
-
 	"github.com/rwool/ex/ex"
 	"github.com/rwool/ex/log"
 	"github.com/rwool/ex/test/helpers/testlogger"
@@ -28,7 +26,7 @@ type testObjects struct {
 // setupLoggerAndClient sets up an logger, SSH server, and sets up a target with
 // Ex.
 func setupLoggerAndClient(tb testing.TB, level log.Level,
-	serverType sshserver.ServerType, authorizer session.Authorizer, hkc session.HostKeyCallback) *testObjects {
+	serverType sshserver.ServerType, authorizer ex.SSHAuthorizer, hkc ex.SSHHostKeyCallback) *testObjects {
 	logger, logBuf := testlogger.NewTestLogger(tb, level)
 
 	server, err := sshserver.GetSSHServer(serverType, logger)
@@ -43,7 +41,7 @@ func setupLoggerAndClient(tb testing.TB, level log.Level,
 		Host: server.Host(),
 		Port: server.Port(),
 		User: "test",
-		Auths: []session.Authorizer{
+		Auths: []ex.SSHAuthorizer{
 			authorizer,
 		},
 		HostKeyCallback: hkc,

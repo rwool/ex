@@ -13,7 +13,8 @@ import (
 
 	"github.com/pkg/errors"
 
-	"github.com/rwool/ex/ex/session"
+	"github.com/rwool/ex/ex/internal/recorder"
+	"github.com/rwool/ex/ex/internal/sshtarget"
 	"github.com/rwool/ex/log"
 )
 
@@ -54,8 +55,8 @@ type Ex struct {
 	nameToTargets   map[string]Target
 
 	recordingsMu      sync.RWMutex
-	recorderC         chan *Recorder
-	completedCommands []*Recorder
+	recorderC         chan *recorder.Recorder
+	completedCommands []*recorder.Recorder
 }
 
 // New creates a new Ex object for executing commands remotely.
@@ -84,7 +85,7 @@ func New(logger log.Logger, stdOut, stdErr io.Writer) *Ex {
 
 		nameToTargets: make(map[string]Target),
 
-		recorderC: make(chan *Recorder),
+		recorderC: make(chan *recorder.Recorder),
 	}
 	r.SetDialer(&net.Dialer{})
 
@@ -143,9 +144,39 @@ type SSHTargetConfig struct {
 	User string
 	// Auths is a list of the authorization methods that will be used upon
 	// connection.
-	Auths []session.Authorizer
+	Auths []SSHAuthorizer
 	// HostKeyCallback is a function that is called to verify a host key.
-	HostKeyCallback session.HostKeyCallback
+	HostKeyCallback SSHHostKeyCallback
+}
+
+type SSHCommand struct {
+	*sshtarget.SSHSession
+}
+
+// Run runs the session and waits for it to complete.
+func (s *SSHCommand) Run(ctx context.Context) (Recorder, error) {
+	return s.SSHSession.Run(ctx)
+}
+
+// Start starts the session in a sesparate goroutine.
+//
+// The returned Recorder pointer should not be dereferenced until after Wait
+// completes.
+func (s *SSHCommand) Start(ctx context.Context) (Recorder, error) {
+	return s.SSHSession.Start(ctx)
+}
+
+// SSHTarget adapts the internal SSHTarget to the Target interface.
+//
+// This is necessary due to Go not having covariance.
+type SSHTarget struct {
+	*sshtarget.SSHTarget
+}
+
+// Command runs a command with the SSHTarget.
+func (s *SSHTarget) Command(cmd string, args ...string) Command {
+	t := s.SSHTarget.Command(cmd, args...)
+	return &SSHCommand{SSHSession: t}
 }
 
 // NewSSHTarget creates an SSH target to the given system.
@@ -161,15 +192,24 @@ func (r *Ex) NewSSHTarget(ctx context.Context, conf *SSHTargetConfig) (Target, e
 		return nil, errors.New("target already exists with the given name")
 	}
 
-	hkcOpt := HostKeyValidationOption(conf.HostKeyCallback)
-	target, err := NewSSHTarget(ctx, r.logger, r.dialer, conf.Host, conf.Port, []Option{hkcOpt}, conf.User, conf.Auths)
+	hkcOpt := sshtarget.HostKeyValidationOption(conf.HostKeyCallback)
+	target, err := sshtarget.New(ctx,
+		r.logger,
+		r.dialer,
+		conf.Host,
+		conf.Port,
+		[]sshtarget.Option{hkcOpt},
+		conf.User,
+		authConvert(conf.Auths))
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to create SSH target")
 	}
-	r.nameToTargets[conf.Name] = target
+
+	t := &SSHTarget{SSHTarget: target}
+	r.nameToTargets[conf.Name] = t
 	r.logger.Debugf("Added SSH target: %s", conf.Name)
 
-	return target, nil
+	return t, nil
 }
 
 // Close closes all currently open connections.

@@ -12,8 +12,6 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/rwool/ex/ex/session"
-
 	"github.com/rwool/ex/test/helpers/goroutinechecker"
 
 	"github.com/rwool/ex/test/helpers/testlogger"
@@ -21,6 +19,7 @@ import (
 	"github.com/rwool/ex/ex"
 	"github.com/stretchr/testify/require"
 
+	"github.com/rwool/ex/ex/internal/sshtarget"
 	"github.com/rwool/ex/log"
 )
 
@@ -28,7 +27,7 @@ func TestEx(t *testing.T) {
 	defer goroutinechecker.New(t)()
 
 	logger, logBuf := testlogger.NewTestLogger(t, log.Warn)
-	dialer, hostKey, stopServer := NewSSHServer(logger)
+	dialer, hostKey, stopServer := sshtarget.NewSSHServer(logger)
 	defer func() {
 		stopServer()
 		time.Sleep(50 * time.Millisecond)
@@ -47,10 +46,10 @@ func TestEx(t *testing.T) {
 		Host: "127.0.0.1",
 		Port: 22,
 		User: "test",
-		Auths: []session.Authorizer{
-			session.PasswordAuth("Password123"),
+		Auths: []ex.SSHAuthorizer{
+			ex.NewSSHPasswordAuth("Password123"),
 		},
-		HostKeyCallback: session.FixedHostKey(hostKey),
+		HostKeyCallback: sshtarget.FixedHostKey(hostKey),
 	})
 	require.NoError(t, err, "error creating target")
 
@@ -75,7 +74,7 @@ func TestExFailedLogin(t *testing.T) {
 	defer goroutinechecker.New(t)()
 
 	logger, logBuf := testlogger.NewTestLogger(t, log.Warn)
-	dialer, hostKey, stopServer := NewSSHServer(logger)
+	dialer, hostKey, stopServer := sshtarget.NewSSHServer(logger)
 	defer func() {
 		stopServer()
 		time.Sleep(50 * time.Millisecond)
@@ -94,10 +93,10 @@ func TestExFailedLogin(t *testing.T) {
 		Host: "127.0.0.1",
 		Port: 22,
 		User: "test",
-		Auths: []session.Authorizer{
-			session.PasswordAuth("wrong"),
+		Auths: []ex.SSHAuthorizer{
+			ex.NewSSHPasswordAuth("wrong"),
 		},
-		HostKeyCallback: session.FixedHostKey(hostKey),
+		HostKeyCallback: sshtarget.FixedHostKey(hostKey),
 	})
 
 	defer func() {

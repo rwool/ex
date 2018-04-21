@@ -1,4 +1,4 @@
-package ex
+package sshtarget
 
 import (
 	"context"
@@ -7,18 +7,20 @@ import (
 	"sync"
 
 	"github.com/pkg/errors"
+	"github.com/rwool/ex/ex/internal/recorder"
+	"github.com/rwool/ex/ex/internal/signal"
 	"github.com/rwool/ex/log"
-	"github.com/rwool/ex/ex/session"
 )
 
 // ErrCancelledByTarget indicates command was cancelled indirectly by the
 // target.
 var ErrCancelledByTarget = errors2.New("cancelled by target")
 
-type sshSession struct {
-	ssh    *session.SSH
-	conf   session.RunConfig
-	rec    *Recorder
+// SSHSession is a single session within a SSH connection.
+type SSHSession struct {
+	ssh    *SSH
+	conf   RunConfig
+	rec    *recorder.Recorder
 	logger log.Logger
 
 	mu sync.Mutex
@@ -30,12 +32,12 @@ type sshSession struct {
 	finishFn func()
 }
 
-func newSSHSession(ctx context.Context, finishFn func()) *sshSession {
+func newSSHSession(ctx context.Context, finishFn func()) *SSHSession {
 	if ctx == nil {
 		panic("nil context")
 	}
 
-	ss := &sshSession{
+	ss := &SSHSession{
 		parentCtx: ctx,
 	}
 
@@ -48,54 +50,62 @@ func newSSHSession(ctx context.Context, finishFn func()) *sshSession {
 	return ss
 }
 
-func (ss *sshSession) LogEvent(eventType string, details interface{}) {
+// LogEvent logs an event.
+func (ss *SSHSession) LogEvent(eventType string, details interface{}) {
 	if ss.rec != nil {
 		ss.rec.AddSpecialEvent(eventType, details)
 	}
 }
 
-func (ss *sshSession) SetInput(stdIn io.Reader) {
+// SetInput sets the stdin source.
+func (ss *SSHSession) SetInput(stdIn io.Reader) {
 	ss.mu.Lock()
 	defer ss.mu.Unlock()
 
 	ss.conf.StdIn = stdIn
 }
 
-func (ss *sshSession) SetOutput(stdOut, stdErr io.Writer) {
-	ss.rec.setPassthrough(stdOut, stdErr)
+// SetOutput sets the stdout target.
+func (ss *SSHSession) SetOutput(stdOut, stdErr io.Writer) {
+	ss.rec.SetPassthrough(stdOut, stdErr)
 }
 
-func (ss *sshSession) SetEnv(vars map[string]string) {
+// SetEnv sets the environment variables to be used.
+func (ss *SSHSession) SetEnv(vars map[string]string) {
 	ss.mu.Lock()
 	defer ss.mu.Unlock()
 
 	ss.conf.EnvVars = vars
 }
 
-func (ss *sshSession) SetTerm(height, width int) {
+// SetTerm sets the terminal dimensions on connection.
+func (ss *SSHSession) SetTerm(height, width int) {
 	ss.mu.Lock()
 	defer ss.mu.Unlock()
 
-	ss.conf.PTYConfig = &session.PTYConfig{
+	ss.conf.PTYConfig = &PTYConfig{
 		Term:         "xterm", // Can't find what this value *does*, so it is hardcoded.
 		Height:       height,
 		Width:        width,
-		TerminalMode: session.DefaultTerminalMode,
+		TerminalMode: DefaultTerminalMode,
 	}
 }
 
-func (ss *sshSession) SetWindowChange(winChC <-chan struct{ Height, Width int }) {
+// SetWindowChange sets the channel used to update the window dimensions.
+func (ss *SSHSession) SetWindowChange(winChC <-chan struct{ Height, Width int }) {
 	ss.mu.Lock()
 	defer ss.mu.Unlock()
 
 	ss.conf.WinCh = winChC
 }
 
-func (ss *sshSession) Signal(s Signal) error {
+// Signal is used to send a signal.
+func (ss *SSHSession) Signal(s signal.Signal) error {
 	return errors.New("unimplemented")
 }
 
-func (ss *sshSession) Run(ctx context.Context) (*Recorder, error) {
+// Run runs the session and waits for it to complete.
+func (ss *SSHSession) Run(ctx context.Context) (*recorder.Recorder, error) {
 	ss.mu.Lock()
 	defer ss.mu.Unlock()
 
@@ -124,7 +134,11 @@ func (ss *sshSession) Run(ctx context.Context) (*Recorder, error) {
 	return ss.rec, errors.Wrap(err, "run command error")
 }
 
-func (ss *sshSession) Start(ctx context.Context) (*Recorder, error) {
+// Start starts the session in a sesparate goroutine.
+//
+// The returned Recorder pointer should not be dereferenced until after Wait
+// completes.
+func (ss *SSHSession) Start(ctx context.Context) (*recorder.Recorder, error) {
 	ss.mu.Lock()
 	defer ss.mu.Unlock()
 
@@ -153,7 +167,10 @@ func (ss *sshSession) Start(ctx context.Context) (*Recorder, error) {
 	return ss.rec, nil
 }
 
-func (ss *sshSession) Wait() error {
+// Wait waits for the session to complete after calling Start.
+//
+// If Start has not been called, an error will be returned.
+func (ss *SSHSession) Wait() error {
 	ss.mu.Lock()
 	defer ss.mu.Unlock()
 

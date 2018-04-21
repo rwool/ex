@@ -19,7 +19,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/pkg/errors"
-	"github.com/rwool/ex/ex/session"
 
 	"github.com/rwool/ex/test/integration/sshserver"
 
@@ -41,8 +40,8 @@ func TestWhoami(t *testing.T) {
 
 func testWhoami(t *testing.T, sType sshserver.ServerType) {
 	to := setupLoggerAndClient(t, log.Warn,
-		sType, session.PasswordAuth("password123"),
-		session.InsecureIgnoreHostKey())
+		sType, ex.NewSSHPasswordAuth("password123"),
+		ex.SSHInsecureIgnoreHostKey())
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
@@ -59,8 +58,8 @@ func runCommandWithExpectedOutput(t *testing.T, command string, buf *bytes.Buffe
 	t.Helper()
 
 	to := setupLoggerAndClient(t, log.Warn,
-		sshserver.OpenSSH, session.PasswordAuth("password123"),
-		session.InsecureIgnoreHostKey())
+		sshserver.OpenSSH, ex.NewSSHPasswordAuth("password123"),
+		ex.SSHInsecureIgnoreHostKey())
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
@@ -124,8 +123,8 @@ func testMaxSessions(t *testing.T, sType sshserver.ServerType) {
 		t.Run(tc.Name, func(t2 *testing.T) {
 
 			to := setupLoggerAndClient(t2, log.Warn,
-				sType, session.PasswordAuth("password123"),
-				session.InsecureIgnoreHostKey())
+				sType, ex.NewSSHPasswordAuth("password123"),
+				ex.SSHInsecureIgnoreHostKey())
 
 			var numGR int
 			if mspc := to.Server.Info().MaxSessionsPerConn; mspc == -1 {
@@ -239,8 +238,8 @@ func testEscapes(t *testing.T, sType sshserver.ServerType) {
 			expectedTestEnd := testStart.Add(5*time.Second + tc.After)
 
 			to := setupLoggerAndClient(t2, log.Warn,
-				sType, session.PasswordAuth("password123"),
-				session.InsecureIgnoreHostKey())
+				sType, ex.NewSSHPasswordAuth("password123"),
+				ex.SSHInsecureIgnoreHostKey())
 
 			r := bytes.NewReader(tc.EscapeSequence)
 			br := blockingreader.NewBlockingReader(tc.After, r)

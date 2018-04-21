@@ -1,25 +1,22 @@
-package ex
+package sshtarget_test
 
 import (
-	"fmt"
-	"io"
-	"os/user"
-	"testing"
-
-	"errors"
-
-	errors2 "github.com/pkg/errors"
-
 	"bytes"
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/rsa"
-
+	"errors"
+	"fmt"
+	"io"
 	"io/ioutil"
 	"net"
 	"os"
+	"os/user"
+	"testing"
 
+	errors2 "github.com/pkg/errors"
+	"github.com/rwool/ex/ex/internal/sshtarget"
 	"github.com/rwool/ex/test/helpers/comperr"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -54,14 +51,14 @@ func TestGetKnownHostsPaths(t *testing.T) {
 				}
 				return c1, nil
 			}
-			assert.Equal(t, globalKnownHosts, s,
+			assert.Equal(t, sshtarget.GlobalKnownHosts, s,
 				"unexpected global known_hosts path")
 			if e2 != nil {
 				return nil, e2
 			}
 			return c2, nil
 		}
-		paths, err := getKnownHostPaths(opener)
+		paths, err := sshtarget.GetKnownHostPaths(opener)
 		assert.Equal(t, numCalls, call, "too many calls to file opener")
 		return paths, err
 	}
@@ -79,7 +76,7 @@ func TestGetKnownHostsPaths(t *testing.T) {
 		{
 			Name:          "Both Files Accessible",
 			NumCalls:      2,
-			ExpectedPaths: []string{globalKnownHosts, userKH},
+			ExpectedPaths: []string{sshtarget.GlobalKnownHosts, userKH},
 		},
 		{
 			Name:          "User KH Only",
@@ -91,7 +88,7 @@ func TestGetKnownHostsPaths(t *testing.T) {
 			Name:          "Global KH Only",
 			E1:            errors.New("file does not exist"),
 			NumCalls:      2,
-			ExpectedPaths: []string{globalKnownHosts},
+			ExpectedPaths: []string{sshtarget.GlobalKnownHosts},
 		},
 		{
 			Name:             "Neither KH Only",
@@ -181,7 +178,7 @@ func TestAddToKnownHosts(t *testing.T) {
 	t.Parallel()
 	tcs := []struct {
 		Name               string
-		Marker             KnownHostsMarker
+		Marker             sshtarget.KnownHostsMarker
 		WriteErr           error
 		SeekErr            error
 		Hosts              []string
@@ -211,7 +208,7 @@ func TestAddToKnownHosts(t *testing.T) {
 		},
 		{
 			Name:      "Two Hosts With Ports ECDSA Revoked",
-			Marker:    MarkerRevoked,
+			Marker:    sshtarget.MarkerRevoked,
 			Hosts:     []string{"127.0.0.1:22", "192.168.0.1:99"},
 			PublicKey: generateKey(ecdsa.PublicKey{}),
 		},
@@ -228,7 +225,7 @@ func TestAddToKnownHosts(t *testing.T) {
 		},
 		{
 			Name:      "IPv6 with Port RSA Cert Authority",
-			Marker:    MarkerCertAuthority,
+			Marker:    sshtarget.MarkerCertAuthority,
 			Hosts:     []string{"[::1]:99"},
 			PublicKey: generateKey(rsa.PublicKey{}),
 		},
@@ -267,7 +264,7 @@ func TestAddToKnownHosts(t *testing.T) {
 				writeErr: tc.WriteErr,
 				seekErr:  tc.SeekErr,
 			}
-			err := AddToKnownHosts(tws, tc.Hosts, tc.PublicKey, tc.DisableHashing, tc.Marker)
+			err := sshtarget.AddToKnownHosts(tws, tc.Hosts, tc.PublicKey, tc.DisableHashing, tc.Marker)
 			comperr.AssertEqualErr(t2, tc.ExpectedErrorCause, errors2.Cause(err),
 				"unexpected error adding host line")
 			if err != nil {
@@ -275,7 +272,7 @@ func TestAddToKnownHosts(t *testing.T) {
 			}
 
 			marker, hosts, pubKey, comment, _, err := ssh.ParseKnownHosts(tws.Bytes())
-			if tc.Marker == MarkerNone {
+			if tc.Marker == sshtarget.MarkerNone {
 				assert.Empty(t2, marker, "unexpected marker where none expected")
 			} else {
 				// ParseKnownHosts removes the leading @ symbol.
@@ -300,7 +297,7 @@ func TestKnownHostsFile(t *testing.T) {
 	defer os.Remove(f.Name())
 	defer f.Close()
 
-	cb, err := KnownHostsFilesCallback(f.Name())
+	cb, err := sshtarget.KnownHostsFilesCallback(f.Name())
 	require.NoError(t, err, "Known host file callback creation does not fail.")
 
 	rsaPrivKey, err := rsa.GenerateKey(rand.Reader, 1024)
@@ -318,14 +315,14 @@ func TestKnownHostsFile(t *testing.T) {
 	}, sshPubKey)
 
 	// Unknown host.
-	require.True(t, IsUnknownHost(err), "Host must be unknown")
+	require.True(t, sshtarget.IsUnknownHost(err), "Host must be unknown")
 
 	// Known host.
-	err = AddToKnownHosts(f, []string{hostIP}, sshPubKey, true, MarkerNone)
+	err = sshtarget.AddToKnownHosts(f, []string{hostIP}, sshPubKey, true, sshtarget.MarkerNone)
 	require.NoError(t, err, "known_hosts host addition does not fail.")
 	_, err = f.Seek(0, io.SeekStart)
 	require.NoError(t, err, "Seek to file beginning does not fail.")
-	cb, err = KnownHostsFilesCallback(f.Name())
+	cb, err = sshtarget.KnownHostsFilesCallback(f.Name())
 	require.NoError(t, err, "Known host file callback creation does not fail.")
 	err = cb(hostname, &net.TCPAddr{
 		IP:   net.ParseIP(hostIP),
@@ -339,30 +336,30 @@ func TestKnownHostsFile(t *testing.T) {
 	rsaPrivKey2, err := rsa.GenerateKey(rand.Reader, 1024)
 	require.NoError(t, err, "Private key generation does not fail.")
 	sshPubKey2, err := ssh.NewPublicKey(rsaPrivKey2.Public())
-	err = AddToKnownHosts(f, []string{hostIP}, sshPubKey2, true, MarkerNone)
+	err = sshtarget.AddToKnownHosts(f, []string{hostIP}, sshPubKey2, true, sshtarget.MarkerNone)
 	require.NoError(t, err, "known_hosts host addition does not fail.")
-	cb, err = KnownHostsFilesCallback(f.Name())
+	cb, err = sshtarget.KnownHostsFilesCallback(f.Name())
 	require.NoError(t, err, "Known host file callback creation does not fail.")
 	err = cb(hostname, &net.TCPAddr{
 		IP:   net.ParseIP(hostIP),
 		Port: port,
 	}, sshPubKey)
-	require.True(t, IsKeyChange(err), "Key for host change detected.")
+	require.True(t, sshtarget.IsKeyChange(err), "Key for host change detected.")
 
 	// Revoked key.
 	err = f.Truncate(0)
 	require.NoError(t, err, "known_hosts trucation must succeed.")
 	_, err = f.Seek(0, io.SeekStart)
 	require.NoError(t, err, "Seek to file beginning does not fail.")
-	err = AddToKnownHosts(f, []string{hostIP}, sshPubKey, true, MarkerRevoked)
+	err = sshtarget.AddToKnownHosts(f, []string{hostIP}, sshPubKey, true, sshtarget.MarkerRevoked)
 	require.NoError(t, err, "known_hosts host addition does not fail.")
 	_, err = f.Seek(0, io.SeekStart)
 	require.NoError(t, err, "Seek to file beginning does not fail.")
-	cb, err = KnownHostsFilesCallback(f.Name())
+	cb, err = sshtarget.KnownHostsFilesCallback(f.Name())
 	require.NoError(t, err, "Known host file callback creation does not fail.")
 	err = cb(hostname, &net.TCPAddr{
 		IP:   net.ParseIP(hostIP),
 		Port: port,
 	}, sshPubKey)
-	require.True(t, IsRevoked(err), "Key revocation detected.")
+	require.True(t, sshtarget.IsRevoked(err), "Key revocation detected.")
 }
